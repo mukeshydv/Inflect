@@ -32,13 +32,31 @@ extension String {
         let _ = try NSRegularExpression(pattern: self, options: .caseInsensitive)
     }
     
-    func matches(_ string: String) -> [String]? {
-        let regex = try? NSRegularExpression(pattern: self, options: .caseInsensitive)
-        guard let result = regex?.matches(in: string, options: .reportProgress, range: NSRange(location: 0, length: string.count)).map ({ (string as NSString).substring(with: $0.range) }), result.count > 0 else {
+    func matches(_ string: String, options: NSRegularExpression.Options) -> [String]? {
+        var regex: NSRegularExpression
+        do {
+            regex = try NSRegularExpression(pattern: self, options: options)
+        } catch {
             return nil
         }
         
-        return result
+        let matches = regex.matches(in: string, options: [], range: NSRange(location:0, length: string.count))
+        
+        guard let match = matches.first else { return nil }
+        
+        let lastRangeIndex = match.numberOfRanges - 1
+        guard lastRangeIndex >= 1 else { return nil }
+        
+        var results = [String]()
+        for i in 1...lastRangeIndex {
+            let capturedGroupIndex = match.range(at: i)
+            if capturedGroupIndex.length > 0 && capturedGroupIndex.location < string.count {
+                let matchedString = (string as NSString).substring(with: capturedGroupIndex)
+                results.append(matchedString)
+            }
+        }
+        
+        return results
     }
     
     func trim() -> String {
@@ -50,6 +68,7 @@ extension String {
     }
     
     func last(_ count: Int) -> String {
+        if count > self.count { return self }
         return String(dropFirst(self.count - count))
     }
     
@@ -58,11 +77,11 @@ extension String {
         var to = to
         
         if from < 0 {
-            from = count - from
+            from = count + from
         }
         
         if to < 0 {
-            to = count - to
+            to = count + to
         }
         
         let startIndex = index(self.startIndex, offsetBy: from)
@@ -122,7 +141,9 @@ extension Dictionary where Key == String, Value == Array<String> {
 extension Dictionary where Key == Int, Value == Set<String> {
     func hasString(_ string: String) -> Bool {
         for (k, v) in self {
-            if v.contains(String(string.dropFirst(string.count-k))) { return true }
+            if k <= string.count {
+                if v.contains(String(string.dropFirst(string.count-k))) { return true }
+            }
         }
         return false
     }

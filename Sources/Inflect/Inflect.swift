@@ -14,7 +14,7 @@ class Inflect {
     
     private var classical_dict = Rules.def_classical
     private var persistent_count = 0
-    private var mill_count = 0
+//    private var mill_count = 0
 //    private var pl_sb_user_defined = [(String, String)]()
 //    private var pl_v_user_defined = [(String, String, String, String, String, String)]()
 //    private var pl_adj_user_defined = [(String, String)]()
@@ -22,27 +22,27 @@ class Inflect {
 //    private var A_a_user_defined = [(String, String)]()
     private var thegender = "neuter"
     
-    private let deprecated_methods = [
-        "pl": "plural",
-        "plnoun": "plural_noun",
-        "plverb": "plural_verb",
-        "pladj": "plural_adj",
-        "sinoun": "single_noun",
-        "prespart": "present_participle",
-        "numwords": "number_to_words",
-        "plequal": "compare",
-        "plnounequal": "compare_nouns",
-        "plverbequal": "compare_verbs'",
-        "pladjequal": "compare_adjs",
-        "wordlist": "join"
-    ]
+//    private let deprecated_methods = [
+//        "pl": "plural",
+//        "plnoun": "plural_noun",
+//        "plverb": "plural_verb",
+//        "pladj": "plural_adj",
+//        "sinoun": "single_noun",
+//        "prespart": "present_participle",
+//        "numwords": "number_to_words",
+//        "plequal": "compare",
+//        "plnounequal": "compare_nouns",
+//        "plverbequal": "compare_verbs'",
+//        "pladjequal": "compare_adjs",
+//        "wordlist": "join"
+//    ]
     
-    func getMethod(_ method: String) throws -> String {
-        if deprecated_methods.keys.contains(method) {
-            print(String(format: "%@() deprecated, use %@()", method, deprecated_methods[method]!))
-        }
-        return ""
-    }
+//    func getMethod(_ method: String) throws -> String {
+//        if deprecated_methods.keys.contains(method) {
+//            print(String(format: "%@() deprecated, use %@()", method, deprecated_methods[method]!))
+//        }
+//        return ""
+//    }
     
 //    func defNoun(singular: String, plural: String) throws {
 //        try checkPat(singular)
@@ -110,10 +110,10 @@ class Inflect {
         }
     }
     
-    func num(count: Int, show: Bool) -> String {
-        persistent_count = count
-        return show ? "\(count)" : ""
-    }
+//    func num(count: Int, show: Bool) -> String {
+//        persistent_count = count
+//        return show ? "\(count)" : ""
+//    }
     
     func gender(_ gender: String) throws {
         /*
@@ -155,23 +155,19 @@ class Inflect {
 //        }
 //    }
     
-    func checkPatPlural(_ pattern: String) throws {
-        return
-    }
+//    func checkPatPlural(_ pattern: String) throws {
+//        return
+//    }
+//
+//    func checkPat(_ pattern: String) throws {
+//        do {
+//            try pattern.validateExpression()
+//        } catch {
+//            throw InflectError.badUserDefinedPatternError
+//        }
+//    }
     
-    func checkPat(_ pattern: String) throws {
-        do {
-            try pattern.validateExpression()
-        } catch {
-            throw InflectError.badUserDefinedPatternError
-        }
-    }
-    
-    func plural(_ text: String, count:Int) -> String {
-        return ""
-    }
-    
-    func postProcess(_ orig: String, inflected: String) -> String {
+    private func postProcess(_ orig: String, inflected: String) -> String {
         var inflected = inflected
         if inflected.contains("|") {
             inflected = String(inflected.split(separator: "|")[classical_dict["all"] == true ? 1 : 0])
@@ -192,10 +188,20 @@ class Inflect {
         return inflected
     }
     
-    func plural(_ text: String, count: String? = nil) -> String {
+    public func plural(_ text: String, count: String? = nil) -> String {
         let word = text.trim()
         let plural = postProcess(word, inflected: pl_special_adjective(word, count: count) ?? pl_special_verb(word, count: count) ?? plNoun(word, count: count))
         return plural
+    }
+    
+    public func pluralNoun(_ text: String, count: String? = nil) -> String {
+        let word = text.trim()
+        return postProcess(word, inflected: plNoun(word, count: count))
+    }
+    
+    public func pluralVerb(_ text: String, count: String? = nil) -> String {
+        let word = text.trim()
+        return postProcess(word, inflected: pl_special_verb(word, count: count) ?? pl_general_verb(word, count: count))
     }
     
     private func pl_special_adjective(_ word: String, count: String? = nil) -> String? {
@@ -203,22 +209,39 @@ class Inflect {
         if count == "1" { return word }
         // TODO: handle user defind adj
         // HANDLE KNOWN CASES
-        if let mo = "^(\(Rules.pl_adj_special_keys))$".matches(word)?.first {
+        if let mo = "^(\(Rules.pl_adj_special_keys))$".matches(word, options: .caseInsensitive)?.first {
             return mo.lowercased()
         }
         
         // HANDLE POSSESSIVES
-        if let mo = "^(\(Rules.pl_adj_poss_keys))$".matches(word)?.first {
+        if let mo = "^(\(Rules.pl_adj_poss_keys))$".matches(word, options: .caseInsensitive)?.first {
             return mo.lowercased()
         }
         
-        if let mo = "^(.*)'s?$".matches(word)?.first {
+        if let mo = "^(.*)'s?$".matches(word, options: [])?.first {
             let pl = pluralNoun(mo)
             let trailingS = pl.last == "s" ? "" : "s"
             return "\(pl)\(trailingS)"
         }
         
         return nil
+    }
+    
+    private func pl_general_verb(_ word: String, count: String?) -> String {
+        let count = getCount(count)
+        if count == "1" { return word }
+        
+        // HANDLE AMBIGUOUS PRESENT TENSES  (SIMPLE AND COMPOUND)
+        if let mo = "^(\(Rules.plverb_ambiguous_pres_keys))((\\s.*)?)$".matches(word, options: .caseInsensitive), mo.count > 1 {
+            return "\(Rules.plverb_ambiguous_pres[mo[0].lowercased()]!)\(mo[1])"
+        }
+        
+        // HANDLE AMBIGUOUS PRETERITE AND PERFECT TENSES
+        if let _ = "^(\(Rules.plverb_ambiguous_non_pres))((\\s.*)?)$".matches(word, options: .caseInsensitive) {
+            return word
+        }
+        
+        return word
     }
     
     private func pl_special_verb(_ word: String, count: String?) -> String? {
@@ -232,26 +255,30 @@ class Inflect {
         }
         
         // TODO: HANDLE USER-DEFINED VERBS
-        // HANDLE IRREGULAR PRESENT TENSE (SIMPLE AND COMPOUND)
+        
         let lowerword = word.lowercased()
         if let firstSeq = lowerword.split(separator: " ").first {
             let firstWord = String(firstSeq)
             
+            // HANDLE IRREGULAR PRESENT TENSE (SIMPLE AND COMPOUND)
             if Rules.plverb_irregular_pres.keys.contains(firstWord) {
                 return "\(Rules.plverb_irregular_pres[firstWord]!)\(word.suffix(word.count - firstWord.count))"
             }
             
+            // HANDLE IRREGULAR FUTURE, PRETERITE AND PERFECT TENSES
             if Rules.plverb_irregular_non_pres.contains(firstWord) { return word }
             
+            // HANDLE PRESENT NEGATIONS (SIMPLE AND COMPOUND)
             if firstWord.hasSuffix("n't") && Rules.plverb_irregular_pres.keys.contains(firstWord.first(dropping: 3)) {
                 return "\(Rules.plverb_irregular_pres[firstWord.first(dropping: 3)]!)n't\(word.suffix(word.count - firstWord.count))"
             }
             
             if firstWord.hasSuffix("n't") { return word }
             
-            if let _ = "^(\(Rules.plverb_special_s))$".matches(word) { return nil }
+            // HANDLE SPECIAL CASES
+            if let _ = "^(\(Rules.plverb_special_s))$".matches(word, options: []) { return nil }
             
-            if "\\s".matches(word) != nil { return nil }
+            if "\\s".matches(word, options: []) != nil { return nil }
             
             if lowerword == "quizzes" { return "quiz" }
             
@@ -268,18 +295,13 @@ class Inflect {
             
             if lowerword.hasSuffix("oes") && word.count > 3 { return word.first(dropping: 2) }
             
-            if let mo = "^(.*[^s])s$".matches(word), mo.count > 1 {
-                return "\(Rules.plverb_ambiguous_pres[mo[0].lowercased()] ?? "")\(mo[1])"
+            if let mo = "^(.*[^s])s$".matches(word, options: .caseInsensitive), mo.count > 0 {
+                return mo[0]
             }
         }
         
         // OTHERWISE, A REGULAR VERB (HANDLE ELSEWHERE)
         return nil
-    }
-    
-    func pluralNoun(_ text: String, count: String? = nil) -> String {
-        let word = text.trim()
-        return postProcess(word, inflected: plNoun(word, count: count))
     }
     
     private func plNoun(_ word: String, count: String? = nil) -> String {
@@ -293,20 +315,23 @@ class Inflect {
         
         if Rules.pl_sb_uninflected_complete.contains(lowecase) { return word }
         
+        if Rules.pl_sb_uninflected_caps.contains(word) { return word }
+        
         if Rules.pl_sb_uninflected_bysize.hasString(lowecase) {
             return word
         }
         
         if classical_dict["herd"] == true && Rules.pl_sb_uninflected_herd.contains(word) { return word }
         
-        if let mo = "^(?:\(Rules.pl_sb_postfix_adj_stems))$".matches(word) {
+        // HANDLE COMPOUNDS ("Governor General", "mother-in-law", "aide-de-camp", ETC.)
+        if let mo = "^(?:\(Rules.pl_sb_postfix_adj_stems))$".matches(word, options: .caseInsensitive) {
             if mo.count >= 2 {
                 return "\(plNoun(mo[0], count:"2"))\(mo[1]))"
             }
         }
         
         if lowecase.contains(" a ") || lowecase.contains("-a-") {
-            if let mo = "^(?:\(Rules.pl_sb_prep_dual_compound))$".matches(word) {
+            if let mo = "^(?:\(Rules.pl_sb_prep_dual_compound))$".matches(word, options: .caseInsensitive) {
                 if mo.count >= 3 {
                     return "\(plNoun(mo[0], count:"2"))\(mo[1])\(plNoun(mo[2]))"
                 }
@@ -333,11 +358,15 @@ class Inflect {
         }
         
         for (k, v) in Rules.pl_pron_acc_keys_bysize {
-            if v.contains(String(lowecase.dropFirst(lowecase.count-k))) {
-                for (pk, pv) in Rules.pl_prep_bysize {
-                    if pv.contains(String(lowecase.dropFirst(lowecase.count-pk))) {
-                        if (lowecase.split(separator: " ").map { String($0) }) == [String(lowecase.prefix(pk)), String(lowecase.dropFirst(lowecase.count - k))] {
-                            return lowecase.dropLast(k) + (Rules.pl_pron_acc[String(lowecase.dropFirst(lowecase.count - k))] ?? "")
+            if k <= lowecase.count {
+                if v.contains(String(lowecase.last(k))) {
+                    for (pk, pv) in Rules.pl_prep_bysize {
+                        if pk <= lowecase.count {
+                            if pv.contains(String(lowecase.prefix(pk))) {
+                                if (lowecase.split(separator: " ").map { String($0) }) == [String(lowecase.prefix(pk)), String(lowecase.last(k))] {
+                                    return lowecase.dropLast(k) + (Rules.pl_pron_acc[String(lowecase.last(k))] ?? "")
+                                }
+                            }
                         }
                     }
                 }
@@ -348,8 +377,8 @@ class Inflect {
         
         if let pl = Rules.pl_pron_acc[lowecase] { return pl }
         
-        //HANDLE ISOLATED IRREGULAR PLURALS
-        lowerSplit = lowecase.split(separator: " ").map { String($0) }
+        // HANDLE ISOLATED IRREGULAR PLURALS
+        lowerSplit = word.split(separator: " ").map { String($0) }
         if let lastWord = lowerSplit.last {
             let lowerLastWord = lastWord.lowercased()
             var length = 0
@@ -363,55 +392,61 @@ class Inflect {
                 return "\(word.dropLast(length))\(Rules.plSbIrregular[lowerLastWord] ?? "")"
             }
             
-            let lastTwoWord = " ".join(Array(lowerSplit.suffix(from: lowerSplit.count - 2))).lowercased()
-            if Rules.plSbIrregularCompound.keys.contains(lastTwoWord) {
-                length = lastTwoWord.count
-                return "\(word.dropLast(length))\(Rules.plSbIrregularCompound[lastTwoWord] ?? "")"
+            if lowerSplit.count > 1 {
+                let lastTwoWord = " ".join(Array(lowerSplit.suffix(from: lowerSplit.count - 2))).lowercased()
+                if Rules.plSbIrregularCompound.keys.contains(lastTwoWord) {
+                    length = lastTwoWord.count
+                    return "\(word.dropLast(length))\(Rules.plSbIrregularCompound[lastTwoWord] ?? "")"
+                }
             }
             
-            if lowecase.dropFirst(lowecase.count - 3) == "quy" {
+            if lowecase.last(3) == "quy" {
                 return  word.dropLast(1) + "ies"
             }
             
-            if lowecase.dropFirst(lowecase.count - 6) == "person" {
-                if classical_dict["persons"] == true {
-                    return word + "s"
-                } else {
-                    return word.dropLast(4) + "ople"
+            if lowecase.count > 5 {
+                if lowecase.last(6) == "person" {
+                    if classical_dict["persons"] == true {
+                        return word + "s"
+                    } else {
+                        return word.dropLast(4) + "ople"
+                    }
                 }
             }
         }
         
         // HANDLE FAMILIES OF IRREGULAR PLURALS
-        if lowecase.dropFirst(lowecase.count-3) == "man" {
+        if lowecase.last(3) == "man" {
             
             if Rules.pl_sb_U_man_mans_bysize.hasString(lowecase) {
                 return word + "s"
             }
             
-            if Rules.pl_sb_U_man_mans_caps_bysize.hasString(lowecase) {
+            if Rules.pl_sb_U_man_mans_caps_bysize.hasString(word) {
                 return word + "s"
             }
+            
+            return word.first(dropping: 3) + "men"
         }
         
-        if lowecase.dropFirst(lowecase.count-5) == "mouse" {
-            return "mice"
+        if lowecase.last(5) == "mouse" {
+            return lowecase.first(dropping: 5) + "mice"
         }
         
-        if lowecase.dropFirst(lowecase.count-5) == "louse" {
-            return "lice"
+        if lowecase.last(5) == "louse" {
+            return lowecase.first(dropping: 5) + "lice"
         }
         
-        if lowecase.dropFirst(lowecase.count-5) == "goose" {
-            return "geese"
+        if lowecase.last(5) == "goose" {
+            return lowecase.first(dropping: 5) + "geese"
         }
         
-        if lowecase.dropFirst(lowecase.count-5) == "tooth" {
-            return "teeth"
+        if lowecase.last(5) == "tooth" {
+            return lowecase.first(dropping: 5) + "teeth"
         }
         
-        if lowecase.dropFirst(lowecase.count-4) == "foot" {
-            return "feet"
+        if lowecase.last(4) == "foot" {
+            return lowecase.first(dropping: 4) + "feet"
         }
         
         if lowecase == "die" {
@@ -419,15 +454,15 @@ class Inflect {
         }
         
         // HANDLE UNASSIMILATED IMPORTS
-        if lowecase.dropFirst(lowecase.count-4) == "ceps" {
+        if lowecase.last(4) == "ceps" {
             return word
         }
         
-        if lowecase.dropFirst(lowecase.count-4) == "zoon" {
+        if lowecase.last(4) == "zoon" {
             return word.dropLast(2) + "a"
         }
         
-        if ["cis", "sis", "xis"].contains(String(lowecase.dropFirst(lowecase.count - 3))) {
+        if ["cis", "sis", "xis"].contains(String(lowecase.last(3))) {
             return word.dropLast(2) + "es"
         }
         
@@ -450,15 +485,15 @@ class Inflect {
         
         // HANDLE INCOMPLETELY ASSIMILATED IMPORTS
         if classical_dict["ancient"] == true {
-            if lowecase.dropFirst(lowecase.count - 4) == "trix" {
+            if lowecase.last(4) == "trix" {
                 return word.dropLast(1) + "ces"
             }
             
-            if ["eau", "ieu"].contains(lowecase.dropFirst(lowecase.count - 3)) {
+            if ["eau", "ieu"].contains(lowecase.last(3)) {
                 return word + "x"
             }
             
-            if ["ynx", "inx", "anx"].contains(lowecase.dropFirst(lowecase.count - 3)) && word.count > 4 {
+            if ["ynx", "inx", "anx"].contains(lowecase.last(3)) && word.count > 4 {
                 return word.dropLast(1) + "ges"
             }
             
@@ -502,7 +537,7 @@ class Inflect {
             return word + "es"
         }
         
-        if lowecase.dropFirst(lowecase.count-2) == "es" && word.first?.description == word.first?.description.uppercased() {
+        if lowecase.last(2) == "es" && word.first?.description == word.first?.description.uppercased() {
             return word + "es"
         }
         
@@ -555,7 +590,7 @@ class Inflect {
                 }
             }
             
-            return word + "ies"
+            return word.dropLast() + "ies"
         }
                 
         // HANDLE ...o
@@ -572,11 +607,24 @@ class Inflect {
         }
         
         if lowecase.last == "o" {
-            return word + "s"
+            return word + "es"
         }
         
         // OTHERWISE JUST ADD ...s
         return word + "s"
+    }
+    
+    public func singularNoun(_ text: String, count: String? = nil, gender: String? = nil) -> String? {
+        let word = text.trim()
+        if let singular = siNoun(word, count: count, gender: gender) {
+            return postProcess(word, inflected: singular)
+        }
+        return nil
+    }
+    
+    private func siNoun(_ word: String, count: String?, gender: String?) -> String? {
+        
+        return nil
     }
     
     private func getCount(_ count: String?) -> String {
