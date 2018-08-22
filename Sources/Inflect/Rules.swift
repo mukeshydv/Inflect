@@ -14,8 +14,8 @@ enum Rules {
         for key in keys {
             if key.contains("|") {
                 let key1key2 = key.split(separator: "|")
-                result[String(key1key2[0])] = key
-                result[String(key1key2[1])] = key
+                result[String(key1key2[0])] = dict[key]
+                result[String(key1key2[1])] = dict[key]
                 result.removeValue(forKey: key)
             }
         }
