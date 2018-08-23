@@ -1,16 +1,14 @@
-# references:
-# * http://www.objc.io/issue-6/travis-ci.html
-# * https://github.com/supermarin/xcpretty#usage
+matrix:
+  include:
+    - os: linux
+      dist: trusty
+      sudo: required
+    - os: osx
+      osx_image: xcode9.4
+      sudo: required
 
-osx_image: xcode9.4
-language: swift
-sudo: required
-# podfile: Example/Podfile
-# before_install:
-# - gem install cocoapods # Since Travis is not always on latest version
-# - pod install --project-directory=Example
+before_install:
+  - git clone https://github.com/IBM-Swift/Package-Builder.git
+
 script:
-    - swift build
-    - swift test
-after_success:
-    - bash <(curl -s https://codecov.io/bash)
+  - ./Package-Builder/build-package.sh -projectDir .
