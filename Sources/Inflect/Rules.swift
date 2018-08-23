@@ -821,12 +821,18 @@ enum Rules {
     
     static let pl_pron_nom = [
         // NOMINATIVE    REFLEXIVE
-        "i":    "we", "myself":   "ourselves",
-        "you":  "you", "yourself": "yourselves",
-        "she":  "they", "herself":  "themselves",
-        "he":   "they", "himself":  "themselves",
-        "it":   "they", "itself":   "themselves",
-        "they": "they", "themself": "themselves",
+        "i":    "we",
+        "myself":   "ourselves",
+        "you":  "you",
+        "yourself": "yourselves",
+        "she":  "they",
+        "herself":  "themselves",
+        "he":   "they",
+        "himself":  "themselves",
+        "it":   "they",
+        "itself":   "themselves",
+        "they": "they",
+        "themself": "themselves",
         
         // POSSESSIVE
         "mine": "ours",

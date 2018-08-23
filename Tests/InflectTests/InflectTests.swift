@@ -9,20 +9,19 @@ final class InflectTests: XCTestCase {
             do {
                 let data = try String(contentsOfFile: file, encoding: .utf8)
                 let testCases = data.components(separatedBy: .newlines)
-                var failed = 0
                 for testCase in testCases {
                     if testCase.contains("TODO") { continue }
                     
                     let ge = testCase.components(separatedBy: "->")
                     if ge.count == 2 {
-                        let given = ge[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                        var expected = ge[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                        let givenSingular = ge[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                        var givenPlural = ge[1].trimmingCharacters(in: .whitespacesAndNewlines)
                         
                         var comment = ""
-                        if expected.contains("#") {
-                            let ec = expected.components(separatedBy: "#")
+                        if givenPlural.contains("#") {
+                            let ec = givenPlural.components(separatedBy: "#")
                             if ec.count > 1 {
-                                expected = ec[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                                givenPlural = ec[0].trimmingCharacters(in: .whitespacesAndNewlines)
                                 comment = ec[1].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                             }
                         }
@@ -30,21 +29,27 @@ final class InflectTests: XCTestCase {
                         var plural = ""
                         
                         if comment.contains("verb") {
-                            plural = inflect.pluralVerb(given)
+                            plural = inflect.pluralVerb(givenSingular)
                         } else if comment.contains("noun") {
-                            plural = inflect.pluralNoun(given)
+                            plural = inflect.pluralNoun(givenSingular)
                         } else {
-                            plural = inflect.plural(given)
+                            plural = inflect.plural(givenSingular)
                         }
                         
-                        if expected.contains("|") {
-                            expected = expected.components(separatedBy: "|")[0]
+                        if givenPlural.contains("|") {
+                            givenPlural = givenPlural.components(separatedBy: "|")[0]
                         }
                         
-                        let result = plural == expected
-                        failed += result ? 0 : 1
+                        let result = plural == givenPlural
                         
-                        XCTAssert(result, "Failed for \(given): \(expected)")
+                        XCTAssert(result, "Failed Plural for \(givenSingular): \(givenPlural)")
+                        
+                        if !comment.contains("verb") {
+                            do {
+                                let singular = try inflect.singularNoun(givenPlural)
+                                XCTAssert(singular == givenSingular, "Failed Singular for \(givenPlural): \(givenSingular)")
+                            } catch { }
+                        }
                     }
                 }
                 

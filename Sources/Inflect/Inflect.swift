@@ -8,6 +8,7 @@ enum InflectError: Error {
     case badUserDefinedPatternError
     case badRcFileError
     case badGenderError
+    case noSingularNoun
 }
 
 class Inflect {
@@ -614,16 +615,335 @@ class Inflect {
         return word + "s"
     }
     
-    public func singularNoun(_ text: String, count: String? = nil, gender: String? = nil) -> String? {
+    public func singularNoun(_ text: String, count: String? = nil, gender: String? = nil) throws -> String {
         let word = text.trim()
-        if let singular = siNoun(word, count: count, gender: gender) {
-            return postProcess(word, inflected: singular)
-        }
-        return nil
+        let singular = try siNoun(word, count: count, gender: gender)
+        return postProcess(word, inflected: singular)
     }
     
-    private func siNoun(_ word: String, count: String?, gender: String?) -> String? {
+    private func siNoun(_ word: String, count: String?, gender gen: String?) throws -> String {
+        let count = getCount(count)
+        if count == "2" { return word }
         
+        // SET THE GENDER
+        var gender = ""
+        if let gen = gen {
+            if !Rules.singular_pronoun_genders.contains(gen) {
+                throw InflectError.badGenderError
+            }
+            gender = gen
+        } else {
+            gender = thegender
+        }
+        
+        // HANDLE EMPTY WORD, SINGULAR COUNT AND UNINFLECTED PLURALS
+        if word == "" { return word }
+        let lowerword = word.lowercased()
+        
+        if Rules.si_sb_ois_oi_case.contains(word) { return word.first(dropping: 1) }
+        
+        if Rules.pl_sb_uninflected_complete.contains(lowerword) { return word }
+        
+        if Rules.pl_sb_uninflected_caps.contains(word) { return word }
+        
+        if Rules.pl_sb_uninflected_bysize.hasString(word) { return word }
+        
+        if classical_dict["herd"] == true && Rules.pl_sb_uninflected_herd.contains(lowerword) { return word }
+        
+        if Rules.pl_sb_C_us_us.contains(lowerword) { return word }
+        
+        // HANDLE COMPOUNDS ("Governor General", "mother-in-law", "aide-de-camp", ETC.)
+        if let mo = "^(?:\(Rules.pl_sb_postfix_adj_stems))$".matches(word, options: .caseInsensitive), mo.count > 1 {
+            return "\(try siNoun(mo[0], count: "1", gender: gender))\(mo[1])"
+        }
+        
+        var lowerSplit = lowerword.split(separator: " ").map { String($0) }
+        if lowerSplit.count >= 3 {
+            for numword in 1..<lowerSplit.count-1 {
+                if Rules.pl_prep_list_da.contains(lowerSplit[numword]) {
+                    do {
+                        let substring = try siNoun(lowerSplit[numword-1], count: "1", gender: gender)
+                        return " ".join(Array(lowerSplit.prefix(upTo: numword-1) + [substring] + lowerSplit.suffix(from: numword)))
+                    } catch {
+                        return " ".join(lowerSplit.prefix(upTo: numword-1) + [lowerSplit[numword-1]] + lowerSplit.suffix(from: numword))
+                    }
+                }
+            }
+        }
+        
+        lowerSplit = lowerword.split(separator: "-").map { String($0) }
+        if lowerSplit.count >= 3 {
+            for numword in 1..<lowerSplit.count-1 {
+                if Rules.pl_prep_list_da.contains(lowerSplit[numword]) {
+                    do {
+                        let substring = try siNoun(lowerSplit[numword-1], count: "1", gender: gender)
+                        return " ".join(lowerSplit.prefix(upTo: numword-1) + [substring + "-" + lowerSplit[numword] + "-"]) + " ".join(Array(lowerSplit.suffix(from: numword+1)))
+                    } catch {
+                        return " ".join(lowerSplit.prefix(upTo: numword-1) + [lowerSplit[numword-1] + "-" + lowerSplit[numword] + "-"]) + " ".join(Array(lowerSplit.suffix(from: numword+1)))
+                    }
+                }
+            }
+        }
+        
+        // HANDLE PRONOUNS
+        for (k, v) in Rules.si_pron_acc_keys_bysize {
+            if k <= lowerword.count {
+                if v.contains(lowerword.last(k)) {
+                    for (pk, pv) in Rules.pl_prep_bysize {
+                        if pk <= lowerword.count {
+                            if pv.contains(String(lowerword.prefix(pk))) {
+                                if (lowerword.split(separator: " ").map { String($0) }) == [String(lowerword.prefix(pk)), lowerword.last(k)] {
+                                    return lowerword.dropLast(k) + (get_si_pron("acc", word: lowerword.last(k), gender: gender) ?? "")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if let sing = get_si_pron("nom", word: lowerword, gender: gender) {
+            return sing
+        }
+        
+        if let sing = get_si_pron("acc", word: lowerword, gender: gender) {
+            return sing
+        }
+        
+        let wordSplit = word.split(separator: " ").map { String($0) }
+        if let wordLast = wordSplit.last {
+            let lowerWordLast = wordLast.lowercased()
+            if let irregularCaps = Rules.siSbIrregularCaps[wordLast] {
+                return "\(word.first(dropping: wordLast.count))\(irregularCaps)"
+            }
+            
+            if let irregular = Rules.siSbIrregular[lowerWordLast] {
+                return "\(word.first(dropping: wordLast.count))\(irregular)"
+            }
+        }
+        
+        if wordSplit.count > 1 {
+            let key = " ".join(Array(wordSplit.suffix(2))).lowercased()
+            if let compoundIrregular = Rules.siSbIrregularCompound[key] {
+                return "\(word.first(dropping: key.count))\(compoundIrregular)"
+            }
+        }
+        
+        if lowerword.last(5) == "quies" { return word.first(dropping: 3) + "y" }
+        
+        if lowerword.last(7) == "persons" { return word.first(dropping: 1) }
+        
+        if lowerword.last(6) == "people" { return word.first(dropping: 4) + "rson" }
+        
+        // HANDLE FAMILIES OF IRREGULAR PLURALS
+        if lowerword.last(4) == "mans" {
+            if Rules.si_sb_U_man_mans_bysize.hasString(lowerword) { return word.first(dropping: 1) }
+            if Rules.si_sb_U_man_mans_caps_bysize.hasString(word) { return word.first(dropping: 1) }
+        }
+        
+        if lowerword.last(3) == "men" { return word.first(dropping: 3) + "man" }
+        
+        if lowerword.last(4) == "mice" { return word.first(dropping: 4) + "mouse" }
+        
+        if lowerword.last(4) == "lice" { return word.first(dropping: 4) + "louse" }
+        
+        if lowerword.last(5) == "geese" { return word.first(dropping: 5) + "goose" }
+        
+        if lowerword.last(5) == "teeth" { return word.first(dropping: 5) + "tooth" }
+        
+        if lowerword.last(4) == "feet" { return word.first(dropping: 4) + "foot" }
+        
+        if lowerword == "dice" { return "die" }
+        
+        // HANDLE UNASSIMILATED IMPORTS
+        if lowerword.last(4) == "ceps" { return word }
+        
+        if lowerword.last(3) == "zoa" { return word.first(dropping: 1) + "on" }
+        
+        for (lastlet, d, numend, post) in [
+            ("s", Rules.si_sb_U_ch_chs_bysize, 1, ""),
+            ("s", Rules.si_sb_U_ex_ices_bysize, 4, "ex"),
+            ("s", Rules.si_sb_U_ix_ices_bysize, 4, "ix"),
+            ("a", Rules.si_sb_U_um_a_bysize, 1, "um"),
+            ("i", Rules.si_sb_U_us_i_bysize, 1, "us"),
+            ("a", Rules.si_sb_U_on_a_bysize, 1, "on"),
+            ("e", Rules.siSbUAAeBysize, 1, "")
+        ] {
+            if lowerword.last(1) == lastlet {
+                if d.hasString(lowerword) {
+                    return word.first(dropping: numend) + post
+                }
+            }
+        }
+        
+        // HANDLE INCOMPLETELY ASSIMILATED IMPORTS
+        if classical_dict["ancient"] == true {
+            if lowerword.last(6) == "trices" { return word.first(dropping: 3) + "x" }
+            
+            if ["eaux", "ieux"].contains(lowerword.last(4)) { return word.first(dropping: 1) }
+            
+            if ["ynges", "inges", "anges"].contains(lowerword.last(5)) && word.count > 6 {
+                return word.first(dropping: 3) + "x"
+            }
+            
+            for (lastlet, d, numend, post) in [
+                ("a", Rules.si_sb_C_en_ina_bysize, 3, "en"),
+                ("s", Rules.si_sb_C_ex_ices_bysize, 4, "ex"),
+                ("s", Rules.si_sb_C_ix_ices_bysize, 4, "ix"),
+                ("a", Rules.si_sb_C_um_a_bysize, 1, "um"),
+                ("i", Rules.si_sb_C_us_i_bysize, 1, "us"),
+                ("s", Rules.pl_sb_C_us_us_bysize, 0, ""),
+                ("e", Rules.siSbCAAeBysize, 1, ""),
+                ("a", Rules.siSbCAAtaBysize, 2, ""),
+                ("s", Rules.siSbCIsIdesBysize, 3, "s"),
+                ("i", Rules.si_sb_C_o_i_bysize, 1, "o"),
+                ("a", Rules.si_sb_C_on_a_bysize, 1, "on"),
+                ("m", Rules.si_sb_C_im_bysize, 2, ""),
+                ("i", Rules.si_sb_C_i_bysize, 1, ""),
+            ] {
+                if lowerword.last(1) == lastlet {
+                    if d.hasString(lowerword) {
+                        return word.first(dropping: numend) + post
+                    }
+                }
+            }
+        }
+        
+        // HANDLE PLURLS ENDING IN uses -> use
+        if lowerword.last(6) == "houses" || Rules.si_sb_uses_use_case.contains(word) || Rules.si_sb_uses_use.contains(lowerword) {
+            return word.first(dropping: 1)
+        }
+        
+        // HANDLE PLURLS ENDING IN ies -> ie
+        if Rules.si_sb_ies_ie.contains(lowerword) || Rules.si_sb_ies_ie_case.contains(word) {
+            return word.first(dropping: 1)
+        }
+        
+        // HANDLE PLURLS ENDING IN oes -> oe
+        if lowerword.last(5) == "shoes" || Rules.si_sb_oes_oe.contains(lowerword) || Rules.si_sb_oes_oe_case.contains(word) {
+            return word.first(dropping: 1)
+        }
+        
+        // HANDLE SINGULAR NOUNS ENDING IN ...s OR OTHER SILIBANTS
+        if Rules.si_sb_sses_sse.contains(lowerword) || Rules.si_sb_sses_sse_case.contains(word) {
+            return word.first(dropping: 1)
+        }
+        
+        if Rules.si_sb_singular_s_complete.contains(lowerword) {
+            return word.first(dropping: 2)
+        }
+        
+        if Rules.si_sb_singular_s_bysize.hasString(lowerword) {
+            return word.first(dropping: 2)
+        }
+        
+        if lowerword.last(4) == "eses" && word.first?.description == word.first?.description.uppercased() {
+            return word.first(dropping: 2)
+        }
+        
+        if Rules.si_sb_z_zes.contains(lowerword) {
+            return word.first(dropping: 2)
+        }
+        
+        if Rules.si_sb_zzes_zz.contains(lowerword) {
+            return word.first(dropping: 2)
+        }
+        
+        if lowerword.last(4) == "zzes" { return word.first(dropping: 3) }
+
+        if Rules.si_sb_ches_che.contains(lowerword) || Rules.si_sb_ches_che_case.contains(word) {
+            return word.first(dropping: 1)
+        }
+        
+        if ["ches", "shes"].contains(lowerword.last(4)) { return word.first(dropping: 2) }
+        
+        if Rules.si_sb_xes_xe.contains(lowerword) { return word.first(dropping: 1) }
+        
+        if lowerword.last(3) == "xes" { return word.first(dropping: 2) }
+        
+        // HANDLE ...f -> ...ves
+        if Rules.si_sb_ves_ve.contains(lowerword) || Rules.si_sb_ves_ve_case.contains(word) {
+            return word.first(dropping: 1)
+        }
+        
+        if lowerword.last(3) == "ves" {
+            let str5to3 = lowerword.substring(-5, -3)
+            
+            if ["el", "al", "ol"].contains(str5to3) {
+                return word.first(dropping: 3) + "f"
+            }
+            
+            if str5to3 == "ea" && word.substring(-6, -5) != "d" {
+                return word.first(dropping: 3) + "f"
+            }
+            
+            if ["ni", "li", "wi"].contains(str5to3) {
+                return word.first(dropping: 3) + "fe"
+            }
+            
+            if str5to3 == "ar" {
+                return word.first(dropping: 3) + "f"
+            }
+        }
+        
+        // HANDLE ...y
+        if lowerword.last(2) == "ys" {
+            if lowerword.count > 2 && "aeiou".contains(lowerword[3]) {
+                return word.first(dropping: 1)
+            }
+            
+            if classical_dict["names"] == true {
+                if lowerword.last(2) == "ys" && word.last?.description == word.last?.description.uppercased() {
+                    return word.first(dropping: 1)
+                }
+            }
+        }
+        
+        if lowerword.last(3) == "ies" {
+            return word.first(dropping: 3) + "y"
+        }
+        
+        // HANDLE ...o
+        if lowerword.last(2) == "os" {
+            if Rules.si_sb_U_o_os_complete.contains(lowerword) {
+                return word.first(dropping: 1)
+            }
+            
+            if Rules.si_sb_U_o_os_bysize.hasString(lowerword) {
+                return word.first(dropping: 1)
+            }
+            
+            if ["aos", "eos", "ios", "oos", "uos"].contains(lowerword.last(3)) {
+                return word.first(dropping: 1)
+            }
+        }
+        
+        if lowerword.last(3) == "oes" {
+            return word.first(dropping: 2)
+        }
+        
+        // UNASSIMILATED IMPORTS FINAL RULE
+        if Rules.si_sb_es_is.contains(word) {
+            return word.first(dropping: 2) + "is"
+        }
+        
+        // OTHERWISE JUST REMOVE ...s
+        if lowerword.last(1) == "s" {
+            return word.first(dropping: 1)
+        }
+        
+        // COULD NOT FIND SINGULAR
+        throw InflectError.noSingularNoun
+    }
+    
+    private func get_si_pron(_ thecase: String, word: String, gender: String) -> String? {
+        if let sing = Rules.si_pron[thecase]?[word] {
+            if let sing = sing as?[String: String] {
+                return sing[gender]
+            } else {
+                return sing as? String
+            }
+        }
         return nil
     }
     

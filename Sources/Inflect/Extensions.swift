@@ -89,6 +89,10 @@ extension String {
         return String(self[startIndex..<endIndex])
     }
     
+    subscript (_ i: Int) -> String {
+        return String(self[index(startIndex, offsetBy: i)])
+    }
+    
 //    func split(_ regex: String) -> [String] {
 //        return ranges(regex).map { String(self[$0]) }
 //    }
@@ -151,7 +155,11 @@ extension Dictionary where Key == Int, Value == Set<String> {
 
 extension Dictionary where Value: Hashable {
     func reversedDict() -> [Value: Key] {
-        return [Value: Key](uniqueKeysWithValues: self.map { ($1, $0) })
+        var dict = [Value: Key]()
+        for (k,v) in self.map({ ($1, $0) }) {
+            dict[k] = v
+        }
+        return dict
     }
 }
 
