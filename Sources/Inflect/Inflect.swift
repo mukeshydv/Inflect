@@ -13,6 +13,8 @@ enum InflectError: Error {
 
 class Inflect {
     
+    public static let `default` = Inflect()
+    
     private var classical_dict = Rules.def_classical
     private var persistent_count = 0
 //    private var mill_count = 0

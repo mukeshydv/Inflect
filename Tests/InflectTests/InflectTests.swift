@@ -3,7 +3,6 @@ import XCTest
 
 final class InflectTests: XCTestCase {
     func testInflect() {
-        let inflect = Inflect()
         
         let testCases = TestCases.testCases.components(separatedBy: .newlines)
         for testCase in testCases {
@@ -26,11 +25,11 @@ final class InflectTests: XCTestCase {
                 var plural = ""
                 
                 if comment.contains("verb") {
-                    plural = inflect.pluralVerb(givenSingular)
+                    plural = givenSingular.pluralVerb
                 } else if comment.contains("noun") {
-                    plural = inflect.pluralNoun(givenSingular)
+                    plural = givenSingular.pluralNoun
                 } else {
-                    plural = inflect.plural(givenSingular)
+                    plural = givenSingular.plural
                 }
                 
                 if givenPlural.contains("|") {
@@ -42,10 +41,8 @@ final class InflectTests: XCTestCase {
                 XCTAssert(result, "Failed Plural for \(givenSingular): \(givenPlural)")
                 
                 if !comment.contains("verb") {
-                    do {
-                        let singular = try inflect.singularNoun(givenPlural)
-                        XCTAssert(singular == givenSingular, "Failed Singular for \(givenPlural): \(givenSingular)")
-                    } catch { }
+                    let singular = givenPlural.singularNoun
+                    XCTAssert(singular == givenSingular, "Failed Singular for \(givenPlural): \(givenSingular)")
                 }
             }
         }
