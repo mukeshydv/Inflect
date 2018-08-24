@@ -40,6 +40,8 @@ public final class Inflect {
 //        "wordlist": "join"
 //    ]
     
+    public init() { }
+    
 //    func getMethod(_ method: String) throws -> String {
 //        if deprecated_methods.keys.contains(method) {
 //            print(String(format: "%@() deprecated, use %@()", method, deprecated_methods[method]!))
