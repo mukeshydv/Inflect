@@ -11,7 +11,7 @@ enum InflectError: Error {
     case noSingularNoun
 }
 
-class Inflect {
+public final class Inflect {
     
     public static let `default` = Inflect()
     
