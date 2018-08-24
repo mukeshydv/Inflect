@@ -170,6 +170,14 @@ class Inflect {
 //        }
 //    }
     
+    private func preprocess(_ text: String) -> (String, String, String) {
+        let appendedExtraSpaces = " \(text) "
+        if let mo = "\\A(\\s*)(.+?)(\\s*)\\Z".matches(appendedExtraSpaces, options: []), mo.count == 3 {
+            return (mo[0].first(dropping: 1), mo[1], mo[2].first(dropping: 1))
+        }
+        return ("", text, "")
+    }
+    
     private func postProcess(_ orig: String, inflected: String) -> String {
         var inflected = inflected
         if inflected.contains("|") {
@@ -192,19 +200,21 @@ class Inflect {
     }
     
     public func plural(_ text: String, count: String? = nil) -> String {
-        let word = text.trim()
+        let (pre, word, post) = preprocess(text)
         let plural = postProcess(word, inflected: pl_special_adjective(word, count: count) ?? pl_special_verb(word, count: count) ?? plNoun(word, count: count))
-        return plural
+        return pre + plural + post
     }
     
     public func pluralNoun(_ text: String, count: String? = nil) -> String {
-        let word = text.trim()
-        return postProcess(word, inflected: plNoun(word, count: count))
+        let (pre, word, post) = preprocess(text)
+        let plural = postProcess(word, inflected: plNoun(word, count: count))
+        return pre + plural + post
     }
     
     public func pluralVerb(_ text: String, count: String? = nil) -> String {
-        let word = text.trim()
-        return postProcess(word, inflected: pl_special_verb(word, count: count) ?? pl_general_verb(word, count: count))
+        let (pre, word, post) = preprocess(text)
+        let plural = postProcess(word, inflected: pl_special_verb(word, count: count) ?? pl_general_verb(word, count: count))
+        return pre + plural + post
     }
     
     private func pl_special_adjective(_ word: String, count: String? = nil) -> String? {
@@ -618,9 +628,9 @@ class Inflect {
     }
     
     public func singularNoun(_ text: String, count: String? = nil, gender: String? = nil) throws -> String {
-        let word = text.trim()
+        let (pre, word, post) = preprocess(text)
         let singular = try siNoun(word, count: count, gender: gender)
-        return postProcess(word, inflected: singular)
+        return pre + postProcess(word, inflected: singular) + post
     }
     
     private func siNoun(_ word: String, count: String?, gender gen: String?) throws -> String {
